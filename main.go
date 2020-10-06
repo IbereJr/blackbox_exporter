@@ -35,6 +35,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	pconfig "github.com/prometheus/common/config"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
@@ -103,6 +104,15 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 		return
 	}
 
+	usr := params.Get("user")
+	pwd := params.Get("password")
+	if usr != "" {
+		fmt.Println("Vou Trocar usuario e senha: " + usr + ":" + pwd)
+		newUser := &pconfig.BasicAuth{Username: usr, Password: pconfig.Secret(pwd), PasswordFile: ""}
+		module.HTTP.HTTPClientConfig.BasicAuth = newUser
+		fmt.Printf("%T\n", module.HTTP.HTTPClientConfig.BasicAuth.Password)
+	}
+
 	prober, ok := Probers[module.Prober]
 	if !ok {
 		http.Error(w, fmt.Sprintf("Unknown prober %q", module.Prober), http.StatusBadRequest)
@@ -116,6 +126,8 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
+	fmt.Println("Configuracao:")
+	fmt.Printf("%T", module)
 	success := prober(ctx, target, module, registry, sl)
 	duration := time.Since(start).Seconds()
 	probeDurationGauge.Set(duration)
